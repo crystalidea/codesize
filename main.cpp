@@ -20,6 +20,24 @@ QString formatFileSize(qint64 size) {
         return QString::number(size) + " bytes";
 }
 
+int countLines(const QString& filePath) {
+	QFile file(filePath);
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		qWarning() << "Cannot open file:" << filePath;
+		return -1;
+	}
+
+	QTextStream in(&file);
+	int lineCount = 0;
+	while (!in.atEnd()) {
+		in.readLine();
+		++lineCount;
+	}
+
+	file.close();
+	return lineCount;
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
@@ -38,6 +56,8 @@ int main(int argc, char *argv[])
     qint64 totalSizeInBytes = 0;
     int nTotalFiles = 0;
 
+    int codeLines = 0;
+
     while (it.hasNext())
     {
         QString path = it.next();
@@ -50,12 +70,14 @@ int main(int argc, char *argv[])
         //qInfo() << "File: " << fullPath;
 
         totalSizeInBytes += it.fileInfo().size();
+        codeLines += countLines(fullPath);
 
         nTotalFiles++;
     }
 
     qInfo() << "Total code files: " << nTotalFiles;
     qInfo() << "Code size: " << formatFileSize(totalSizeInBytes);
+    qInfo() << "Code lines: " << codeLines;
 
     return 0; // a.exec();
 }
