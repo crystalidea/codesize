@@ -30,8 +30,10 @@ int countLines(const QString& filePath) {
 	QTextStream in(&file);
 	int lineCount = 0;
 	while (!in.atEnd()) {
-		in.readLine();
-		++lineCount;
+		QString line = in.readLine();
+		if (!line.trimmed().isEmpty()) {
+			++lineCount;
+		}
 	}
 
 	file.close();
