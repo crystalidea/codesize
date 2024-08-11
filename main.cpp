@@ -1,6 +1,6 @@
 #include <QtCore>
 
-static const QStringList sourceExtensions = { "*.cc", "*.h", "*.hpp", "*.cpp" };
+static const QStringList sourceExtensions = { "*.cc", "*.h", "*.hpp", "*.cpp", "*.c" };
 static const QStringList ignoredFileNameStartsWith = { "moc_", "qrc_", "ui_" };
 
 #include "helpers.h"
@@ -33,60 +33,76 @@ int main(int argc, char *argv[])
     // Process the actual command line arguments given by the user
     parser.process(app);
 
-    // Get the optional path argument or use current path
-    QString targetPath = parser.positionalArguments().isEmpty() ? QDir::currentPath() : parser.positionalArguments().first();
+    QStringList targetPaths;
     QStringList ignoredFiles;
 
+    if (parser.positionalArguments().size())
+    {
+        for (qsizetype i = 0; i < parser.positionalArguments().size(); i++)
+        {
+            targetPaths.push_back(parser.positionalArguments().at(i));
+
+            qInfo() << "Dir: " << QDir::toNativeSeparators(targetPaths.last());
+        }
+    }
+    else
+    {
+        targetPaths = { QDir::currentPath() };
+
+        qInfo() << "Dir: " << QDir::toNativeSeparators(targetPaths.first());
+    }
+
     // Get the skip option if provided
-    if (parser.isSet(skipOption)) {
+    if (parser.isSet(skipOption)) 
+    {
         QString skipValue = parser.value(skipOption);
         ignoredFiles = skipValue.split(',', Qt::SkipEmptyParts);
     }
 
-    qInfo() << "Dir: " << QDir::toNativeSeparators(targetPath);
-
-    if (!ignoredFiles.isEmpty()) 
-    {
-        qInfo() << "Ignored file names: " << ignoredFiles;
-    }
-    else {
-        qInfo() << "No files to skip.";
-    }
-
-    QDir dir(targetPath);
-
-    QDirIterator it(targetPath, sourceExtensions, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-
     qint64 totalSizeInBytes = 0;
     int nTotalFiles = 0;
-
     int codeLines = 0;
 
-    while (it.hasNext())
+    for (const QString& targetPath : targetPaths)
     {
-        QString path = it.next();
+        QDir dir(targetPath);
 
-        QString fullPath = it.filePath();
+        QDirIterator it(targetPath, sourceExtensions, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
 
-        QFileInfo fi = it.fileInfo();
+        while (it.hasNext())
+        {
+            QString path = it.next();
 
-        if (isIgnoredFile(fi.fileName()))
-            continue;
+            QString fullPath = it.filePath();
 
-        if (ignoredFiles.contains(fi.fileName(), Qt::CaseInsensitive))
-            continue;
+            QFileInfo fi = it.fileInfo();
 
-        QString dirName = QFileInfo(fi.path()).fileName();
+            if (isIgnoredFile(fi.fileName()))
+                continue;
 
-        if (ignoredFiles.contains(dirName, Qt::CaseInsensitive))
-            continue;
+            if (ignoredFiles.contains(fi.fileName(), Qt::CaseInsensitive))
+            {
+                qInfo() << "Skipped file: " << fullPath;
 
-        //qInfo() << "File: " << fullPath;
+                continue;
+            }
 
-        totalSizeInBytes += fi.size();
-        codeLines += Helpers::countCodeLines(fullPath);
+            QString dirName = QFileInfo(fi.path()).fileName();
 
-        nTotalFiles++;
+            if (ignoredFiles.contains(dirName, Qt::CaseInsensitive))
+            {
+                qInfo() << "Skipped file: " << fullPath;
+
+                continue;
+            }
+
+            //qInfo() << "File: " << fullPath;
+
+            totalSizeInBytes += fi.size();
+            codeLines += Helpers::countCodeLines(fullPath);
+
+            nTotalFiles++;
+        }
     }
 
     qInfo() << "Total code files: " << nTotalFiles;
