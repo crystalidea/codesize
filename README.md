@@ -9,10 +9,9 @@ Simple Qt-based command line tool that calculates the total C++ code size of a d
 ```
 
 ```
-Dir:  "~/projects/mySourceDir"
-Total code files:  2076
-Code size:  "33.40 MB"
-Code lines:  893932
+ C++ code size: 33.40 MB
+C++ code lines: 893932
+C++ code files: 2076
 ```
 
 You can pass arbitrary number of directories.
