@@ -14,6 +14,46 @@ bool isIgnoredFile(const QString& fileName)
     return false;
 }
 
+using codeSizeResult = QVector<quint32>; // bytes, code lines, total files
+
+codeSizeResult processCodeDirectory(const QString& targetPath, const QStringList ignoredFiles, bool verbose)
+{
+    quint32 totalSizeInBytes = 0;
+    quint32 nTotalFiles = 0;
+    quint32 codeLines = 0;
+
+    QDir dir(targetPath);
+
+    QDirIterator it(targetPath, sourceExtensions, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+
+    while (it.hasNext())
+    {
+        QString path = it.next();
+        QString fullPath = it.filePath();
+        QFileInfo fi = it.fileInfo();
+        QString dirName = QFileInfo(fi.path()).fileName();
+
+        if (isIgnoredFile(fi.fileName()) || ignoredFiles.contains(fi.fileName(), Qt::CaseInsensitive) 
+            || ignoredFiles.contains(dirName, Qt::CaseInsensitive))
+        {
+            if (verbose)
+                qInfo().noquote() << "Skipped file: " << QDir::toNativeSeparators(fullPath);
+
+            continue;
+        }
+
+        if (verbose)
+            qInfo().noquote() << "Code file: " << QDir::toNativeSeparators(fullPath);
+
+        totalSizeInBytes += fi.size();
+        codeLines += Helpers::countCodeLines(fullPath);
+
+        nTotalFiles++;
+    }
+
+    return { totalSizeInBytes, codeLines, nTotalFiles };
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
@@ -27,11 +67,18 @@ int main(int argc, char *argv[])
     QCommandLineOption skipOption(QStringList() << "skip", "Comma-separated list of files to skip.", "ignoredFiles");
     parser.addOption(skipOption);
 
+    // Add the --verbose switch
+    QCommandLineOption verboseOption(QStringList() << "verbose", "Enable verbose output.");
+    parser.addOption(verboseOption);
+
     // Positional argument for path (optional)
     parser.addPositionalArgument("path", "The path to process. Default is current directory.");
 
     // Process the actual command line arguments given by the user
     parser.process(app);
+
+    // Check if verbose mode is enabled
+    bool verbose = parser.isSet(verboseOption);
 
     QStringList targetPaths;
     QStringList ignoredFiles;
@@ -42,14 +89,16 @@ int main(int argc, char *argv[])
         {
             targetPaths.push_back(parser.positionalArguments().at(i));
 
-            qInfo() << "Dir: " << QDir::toNativeSeparators(targetPaths.last());
+            if (verbose)
+                qInfo().noquote() << "Dir: " << QDir::toNativeSeparators(targetPaths.last());
         }
     }
     else
     {
         targetPaths = { QDir::currentPath() };
 
-        qInfo() << "Dir: " << QDir::toNativeSeparators(targetPaths.first());
+        if (verbose)
+            qInfo().noquote() << "Dir: " << QDir::toNativeSeparators(targetPaths.first());
     }
 
     // Get the skip option if provided
@@ -59,55 +108,22 @@ int main(int argc, char *argv[])
         ignoredFiles = skipValue.split(',', Qt::SkipEmptyParts);
     }
 
-    qint64 totalSizeInBytes = 0;
-    int nTotalFiles = 0;
-    int codeLines = 0;
+    quint32 totalSizeInBytes = 0;
+    quint32 nTotalFiles = 0;
+    quint32 codeLines = 0;
 
     for (const QString& targetPath : targetPaths)
     {
-        QDir dir(targetPath);
+        codeSizeResult r = processCodeDirectory(targetPath, ignoredFiles, verbose);
 
-        QDirIterator it(targetPath, sourceExtensions, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-
-        while (it.hasNext())
-        {
-            QString path = it.next();
-
-            QString fullPath = it.filePath();
-
-            QFileInfo fi = it.fileInfo();
-
-            if (isIgnoredFile(fi.fileName()))
-                continue;
-
-            if (ignoredFiles.contains(fi.fileName(), Qt::CaseInsensitive))
-            {
-                qInfo() << "Skipped file: " << fullPath;
-
-                continue;
-            }
-
-            QString dirName = QFileInfo(fi.path()).fileName();
-
-            if (ignoredFiles.contains(dirName, Qt::CaseInsensitive))
-            {
-                qInfo() << "Skipped file: " << fullPath;
-
-                continue;
-            }
-
-            //qInfo() << "File: " << fullPath;
-
-            totalSizeInBytes += fi.size();
-            codeLines += Helpers::countCodeLines(fullPath);
-
-            nTotalFiles++;
-        }
+        totalSizeInBytes += r[0];
+        codeLines += r[1];
+        nTotalFiles += r[2];
     }
 
-    qInfo() << "Total code files: " << nTotalFiles;
-    qInfo() << "Code size: " << Helpers::formatFileSize(totalSizeInBytes);
-    qInfo() << "Code lines: " << codeLines;
+    qInfo().noquote() << " C++ code size: " << Helpers::formatFileSize(totalSizeInBytes);
+    qInfo().noquote() << "C++ code lines: " << codeLines;
+    qInfo().noquote() << "C++ code files: " << nTotalFiles;
 
     return 0; // app.exec();
 }
