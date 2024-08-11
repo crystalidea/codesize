@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
     }
 
     qInfo().noquote() << " C++ code size: " << Helpers::formatFileSize(totalSizeInBytes);
-    qInfo().noquote() << "C++ code lines: " << codeLines;
+    qInfo().noquote() << "C++ code lines: " << Helpers::formatCodeLines(codeLines);
     qInfo().noquote() << "C++ code files: " << nTotalFiles;
 
     return 0; // app.exec();

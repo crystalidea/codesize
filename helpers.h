@@ -4,6 +4,7 @@
 
 namespace Helpers
 {
-    QString formatFileSize(qint64 size);
+    QString formatFileSize(qint32 size);
+    QString formatCodeLines(qint32 lines);
     int countCodeLines(const QString& filePath);
 }
