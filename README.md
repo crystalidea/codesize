@@ -15,4 +15,5 @@ Code size:  "33.40 MB"
 Code lines:  893932
 ```
 
+You can pass arbitrary number of directories.
 Optionally you can pass --skip switch to specify comma-separated list of file/folder names to skip.
