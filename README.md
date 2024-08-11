@@ -14,3 +14,5 @@ Total code files:  2076
 Code size:  "33.40 MB"
 Code lines:  893932
 ```
+
+Optionally you can pass --skip switch to specify comma-separated list of file/folder names to skip.
