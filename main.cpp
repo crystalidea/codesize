@@ -1,43 +1,17 @@
-#include <QtCore/QCoreApplication>
-
 #include <QtCore>
 
-QString formatFileSize(qint64 size) {
-    const qint64 KB = 1024;
-    const qint64 MB = 1024 * KB;
-    const qint64 GB = 1024 * MB;
-    const qint64 TB = 1024 * GB;
+static const QStringList sourceExtensions = { "*.cc", "*.h", "*.hpp", "*.cpp" };
+static const QStringList ignoredFileNameStartsWith = { "moc_", "qrc_", "ui_" };
 
-    if (size >= TB)
-        return QString::number(size / (double)TB, 'f', 2) + " TB";
-    else if (size >= GB)
-        return QString::number(size / (double)GB, 'f', 2) + " GB";
-    else if (size >= MB)
-        return QString::number(size / (double)MB, 'f', 2) + " MB";
-    else if (size >= KB)
-        return QString::number(size / (double)KB, 'f', 2) + " KB";
-    else
-        return QString::number(size) + " bytes";
-}
+#include "helpers.h"
 
-int countLines(const QString& filePath) {
-	QFile file(filePath);
-	if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-		qWarning() << "Cannot open file:" << filePath;
-		return -1;
-	}
+bool isIgnoredFile(const QString& fileName)
+{
+    for (auto ext : ignoredFileNameStartsWith)
+        if (fileName.startsWith(ext, Qt::CaseInsensitive))
+            return true;
 
-	QTextStream in(&file);
-	int lineCount = 0;
-	while (!in.atEnd()) {
-		QString line = in.readLine();
-		if (!line.trimmed().isEmpty()) {
-			++lineCount;
-		}
-	}
-
-	file.close();
-	return lineCount;
+    return false;
 }
 
 int main(int argc, char *argv[])
@@ -53,7 +27,7 @@ int main(int argc, char *argv[])
 
     QDir dir(targetPath);
 
-    QDirIterator it(targetPath, { "*.cc", "*.h", "*.cpp" }, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    QDirIterator it(targetPath, sourceExtensions, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
 
     qint64 totalSizeInBytes = 0;
     int nTotalFiles = 0;
@@ -66,19 +40,21 @@ int main(int argc, char *argv[])
 
         QString fullPath = it.filePath();
 
-        if (fullPath.contains("moc_") || fullPath.contains("qrc_") || fullPath.contains("ui_"))
+        QFileInfo fi = it.fileInfo();
+
+        if (isIgnoredFile(fi.fileName()))
             continue;
 
         //qInfo() << "File: " << fullPath;
 
-        totalSizeInBytes += it.fileInfo().size();
-        codeLines += countLines(fullPath);
+        totalSizeInBytes += fi.size();
+        codeLines += Helpers::countCodeLines(fullPath);
 
         nTotalFiles++;
     }
 
     qInfo() << "Total code files: " << nTotalFiles;
-    qInfo() << "Code size: " << formatFileSize(totalSizeInBytes);
+    qInfo() << "Code size: " << Helpers::formatFileSize(totalSizeInBytes);
     qInfo() << "Code lines: " << codeLines;
 
     return 0; // a.exec();
