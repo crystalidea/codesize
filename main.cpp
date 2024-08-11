@@ -16,14 +16,42 @@ bool isIgnoredFile(const QString& fileName)
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication a(argc, argv);
+    QCoreApplication app(argc, argv);
 
-    QString targetPath = QDir::currentPath();
-    
-    if (a.arguments().size() > 1)
-        targetPath = a.arguments().at(1);
+    QCommandLineParser parser;
+
+    parser.setApplicationDescription("codesize");
+    parser.addHelpOption();
+
+    // Add the /skip option
+    QCommandLineOption skipOption(QStringList() << "skip", "Comma-separated list of files to skip.", "ignoredFiles");
+    parser.addOption(skipOption);
+
+    // Positional argument for path (optional)
+    parser.addPositionalArgument("path", "The path to process. Default is current directory.");
+
+    // Process the actual command line arguments given by the user
+    parser.process(app);
+
+    // Get the optional path argument or use current path
+    QString targetPath = parser.positionalArguments().isEmpty() ? QDir::currentPath() : parser.positionalArguments().first();
+    QStringList ignoredFiles;
+
+    // Get the skip option if provided
+    if (parser.isSet(skipOption)) {
+        QString skipValue = parser.value(skipOption);
+        ignoredFiles = skipValue.split(',', Qt::SkipEmptyParts);
+    }
 
     qInfo() << "Dir: " << QDir::toNativeSeparators(targetPath);
+
+    if (!ignoredFiles.isEmpty()) 
+    {
+        qInfo() << "Ignored file names: " << ignoredFiles;
+    }
+    else {
+        qInfo() << "No files to skip.";
+    }
 
     QDir dir(targetPath);
 
@@ -45,6 +73,14 @@ int main(int argc, char *argv[])
         if (isIgnoredFile(fi.fileName()))
             continue;
 
+        if (ignoredFiles.contains(fi.fileName(), Qt::CaseInsensitive))
+            continue;
+
+        QString dirName = QFileInfo(fi.path()).fileName();
+
+        if (ignoredFiles.contains(dirName, Qt::CaseInsensitive))
+            continue;
+
         //qInfo() << "File: " << fullPath;
 
         totalSizeInBytes += fi.size();
@@ -57,5 +93,5 @@ int main(int argc, char *argv[])
     qInfo() << "Code size: " << Helpers::formatFileSize(totalSizeInBytes);
     qInfo() << "Code lines: " << codeLines;
 
-    return 0; // a.exec();
+    return 0; // app.exec();
 }
