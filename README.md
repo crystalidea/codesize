@@ -10,7 +10,7 @@ Simple Qt-based command line tool that calculates the total C++ code size of a d
 
 ```
  C++ code size: 33.40 MB
-C++ code lines: 893932
+C++ code lines: 893.932
 C++ code files: 2076
 ```
 
