@@ -31,17 +31,37 @@ codeSizeResult processCodeDirectory(const QString& targetPath, const QStringList
         QString path = it.next();
         QString fullPath = it.filePath();
         QFileInfo fi = it.fileInfo();
-        QString dirName = QFileInfo(fi.path()).fileName();
 
-        if (isIgnoredFile(fi.fileName()) || ignoredFiles.contains(fi.fileName(), Qt::CaseInsensitive) 
-            || ignoredFiles.contains(dirName, Qt::CaseInsensitive))
+        bool bSkip = false;
+
+        if (isIgnoredFile(fi.fileName()))
         {
             if (verbose)
-                qInfo().noquote() << "Skipped file: " << QDir::toNativeSeparators(fullPath);
+                qInfo().noquote() << "Ignored file: " << QDir::toNativeSeparators(fullPath);
 
-            continue;
+            bSkip = true;
+        }
+        else
+        {
+            for (const QString& skipped : ignoredFiles)
+            {
+                QString dirName = QChar('/') + skipped + QChar('/');
+
+                if (fullPath.contains(dirName) || skipped.compare(fi.fileName(), Qt::CaseInsensitive) == 0)
+                {
+                    if (verbose)
+                        qInfo().noquote() << "Skipped file: " << QDir::toNativeSeparators(fullPath);
+
+                    bSkip = true;
+
+                    break;
+                }
+            }
         }
 
+        if (bSkip)
+            continue;
+        
         if (verbose)
             qInfo().noquote() << "Code file: " << QDir::toNativeSeparators(fullPath);
 
