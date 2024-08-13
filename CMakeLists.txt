@@ -8,13 +8,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Find the required Qt packages
-find_package(Qt5 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 
 # Add the executable
 add_executable(codesize main.cpp helpers.cpp)
 
 # Link the executable to the Qt libraries
-target_link_libraries(codesize Qt5::Core)
+target_link_libraries(codesize Qt6::Core)
 
 # Include directories
 target_include_directories(codesize PRIVATE ${CMAKE_SOURCE_DIR})
