@@ -1,30 +1,89 @@
 #include <QtCore>
 
-static const QStringList sourceExtensions = { "*.cc", "*.h", "*.hpp", "*.cpp", "*.c", "*.m", "*.mm"};
-static const QStringList ignoredFileNameStartsWith = { "moc_", "qrc_", "ui_" };
+#include <format>
+#include <iostream>
+#include <vector>
+#include <string>
 
 #include "helpers.h"
 
-bool isIgnoredFile(const QString& fileName)
+class CodeType
 {
-    for (auto ext : ignoredFileNameStartsWith)
-        if (fileName.startsWith(ext, Qt::CaseInsensitive))
-            return true;
+public:
 
-    return false;
-}
+    virtual QString getName() const = 0;
+    virtual QStringList getExtensions() const = 0;
+    virtual bool isIgnoredFile(const QString &fileName) const = 0;
+};
 
-using codeSizeResult = QVector<quint32>; // bytes, code lines, total files
-
-codeSizeResult processCodeDirectory(const QString& targetPath, const QStringList ignoredFiles, bool verbose)
+class CodeTypeCpp : public CodeType
 {
-    quint32 totalSizeInBytes = 0;
-    quint32 nTotalFiles = 0;
-    quint32 codeLines = 0;
+public:
+
+    QString getName() const
+    {
+        return "C/C++";
+    }
+
+    QStringList getExtensions() const override
+    {
+        return { "*.cc", "*.h", "*.hpp", "*.cpp", "*.c", "*.m", "*.mm" };
+    }
+
+    bool isIgnoredFile(const QString& fileName) const override
+    {
+        static const QStringList ignoredFileNameStartsWith = { "moc_", "qrc_", "ui_" };
+
+        for (auto ext : ignoredFileNameStartsWith)
+            if (fileName.startsWith(ext, Qt::CaseInsensitive))
+                return true;
+
+        return false;
+    }
+};
+
+class UserIgnoredFiles
+{
+public:
+
+    void addFiles(const QStringList& files)
+    {
+        _ignoredFiles = files;
+    }
+
+    bool matchesFilePath(const QString& fullPath) const
+    {
+        QFileInfo fi(fullPath);
+
+        for (const QString& skipped : _ignoredFiles)
+        {
+            QString dirName = QChar('/') + skipped + QChar('/');
+
+            if (fullPath.contains(dirName) || skipped.compare(fi.fileName(), Qt::CaseInsensitive) == 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+private:
+
+    QStringList _ignoredFiles;
+};
+
+using codeSizeResult = std::vector<uint32_t>; // bytes, code lines, total files
+
+codeSizeResult processCodeDirectory(const QString& targetPath, const CodeType *codeType, UserIgnoredFiles *pUserIgnored, bool verbose)
+{
+    uint32_t totalSizeInBytes = 0;
+    uint32_t nTotalFiles = 0;
+    uint32_t codeLines = 0;
 
     QDir dir(targetPath);
 
-    QDirIterator it(targetPath, sourceExtensions, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    QDirIterator it(targetPath, codeType->getExtensions(), QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
 
     while (it.hasNext())
     {
@@ -34,31 +93,21 @@ codeSizeResult processCodeDirectory(const QString& targetPath, const QStringList
 
         bool bSkip = false;
 
-        if (isIgnoredFile(fi.fileName()))
+        if (codeType->isIgnoredFile(fi.fileName()))
         {
             if (verbose)
                 qInfo().noquote() << "Ignored file: " << QDir::toNativeSeparators(fullPath);
 
             bSkip = true;
         }
-        else
+        else if (pUserIgnored->matchesFilePath(fullPath))
         {
-            for (const QString& skipped : ignoredFiles)
-            {
-                QString dirName = QChar('/') + skipped + QChar('/');
+            if (verbose)
+                qInfo().noquote() << "User ignored file: " << QDir::toNativeSeparators(fullPath);
 
-                if (fullPath.contains(dirName) || skipped.compare(fi.fileName(), Qt::CaseInsensitive) == 0)
-                {
-                    if (verbose)
-                        qInfo().noquote() << "Skipped file: " << QDir::toNativeSeparators(fullPath);
-
-                    bSkip = true;
-
-                    break;
-                }
-            }
+            bSkip = true;
         }
-
+        
         if (bSkip)
             continue;
         
@@ -101,8 +150,7 @@ int main(int argc, char *argv[])
     bool verbose = parser.isSet(verboseOption);
 
     QStringList targetPaths;
-    QStringList ignoredFiles;
-
+    
     if (parser.positionalArguments().size())
     {
         for (qsizetype i = 0; i < parser.positionalArguments().size(); i++)
@@ -121,29 +169,39 @@ int main(int argc, char *argv[])
             qInfo().noquote() << "Dir: " << QDir::toNativeSeparators(targetPaths.first());
     }
 
+    CodeType* pCodeType = nullptr;
+
+    UserIgnoredFiles userIgnored;
+
     // Get the skip option if provided
     if (parser.isSet(skipOption)) 
     {
         QString skipValue = parser.value(skipOption);
-        ignoredFiles = skipValue.split(',', Qt::SkipEmptyParts);
+        QStringList fs = skipValue.split(',', Qt::SkipEmptyParts);
+
+        userIgnored.addFiles(fs);
     }
 
-    quint32 totalSizeInBytes = 0;
-    quint32 nTotalFiles = 0;
-    quint32 codeLines = 0;
+    pCodeType = new CodeTypeCpp(); // TODO: add others
+
+    uint32_t totalSizeInBytes = 0;
+    uint32_t nTotalFiles = 0;
+    uint32_t codeLines = 0;
 
     for (const QString& targetPath : targetPaths)
     {
-        codeSizeResult r = processCodeDirectory(targetPath, ignoredFiles, verbose);
+        codeSizeResult r = processCodeDirectory(targetPath, pCodeType, &userIgnored, verbose);
 
         totalSizeInBytes += r[0];
         codeLines += r[1];
         nTotalFiles += r[2];
     }
 
-    qInfo().noquote() << " C++ code size: " << Helpers::formatFileSize(totalSizeInBytes);
-    qInfo().noquote() << "C++ code lines: " << Helpers::formatCodeLines(codeLines);
-    qInfo().noquote() << "C++ code files: " << nTotalFiles;
+    std::cout << std::format("{} code size: {}\n", pCodeType->getName(), Helpers::formatFileSize(totalSizeInBytes));
+    std::cout << std::format("{} code lines: {}\n", pCodeType->getName(), Helpers::formatCodeLines(codeLines));
+    std::cout << std::format("{} code files: {}\n", pCodeType->getName(), nTotalFiles);
+
+    delete pCodeType;
 
     return 0; // app.exec();
 }

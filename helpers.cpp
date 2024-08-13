@@ -38,14 +38,14 @@ QString Helpers::formatCodeLines(qint32 lines)
     return QString::fromStdString(size_formatted);
 }
 
-int Helpers::countCodeLines(const QString& filePath) 
+uint32_t Helpers::countCodeLines(const QString& filePath)
 {
     QFile file(filePath);
     
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) 
     {
         QTextStream in(&file);
-        int lineCount = 0;
+        uint32_t lineCount = 0;
         while (!in.atEnd()) {
             QString line = in.readLine();
             if (!line.trimmed().isEmpty()) {
