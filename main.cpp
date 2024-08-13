@@ -1,6 +1,6 @@
 #include <QtCore>
 
-static const QStringList sourceExtensions = { "*.cc", "*.h", "*.hpp", "*.cpp", "*.c" };
+static const QStringList sourceExtensions = { "*.cc", "*.h", "*.hpp", "*.cpp", "*.c", "*.m", "*.mm"};
 static const QStringList ignoredFileNameStartsWith = { "moc_", "qrc_", "ui_" };
 
 #include "helpers.h"
