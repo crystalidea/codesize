@@ -1,6 +1,6 @@
 ### codesize
 
-Simple Qt-based command line tool that calculates the total code (currently C/C++ only) size of a directory including code lines count. Can be compiled against Qt5/Qt6 and any C++ 20 compiler.
+Simple Qt-based command line tool that calculates the total code (currently C/C++ only) size of a directory including code lines count. Can be compiled against Qt5/Qt6 with any C++ 20 compiler.
 
 **Example usage**:
 
