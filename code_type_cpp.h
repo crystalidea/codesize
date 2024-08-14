@@ -16,7 +16,7 @@ public:
 
     bool isIgnoredFile(const string& fileName) const override
     {
-        static const string_list ignoredFileNameStartsWith = { "moc_", "qrc_", "ui_" }; # Qt generated
+        static const string_list ignoredFileNameStartsWith = { "moc_", "qrc_", "ui_" }; // Qt generated
 
         for (auto ext : ignoredFileNameStartsWith)
             if (Helpers::startsWith(fileName, ext))
