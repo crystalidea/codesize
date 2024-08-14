@@ -1,34 +1,16 @@
 #pragma once
 
-#include <QtCore>
+#include <string>
 
 namespace Helpers
 {
-    QString formatFileSize(qint32 size);
-    QString formatCodeLines(qint32 lines);
-    uint32_t countCodeLines(const QString& filePath);
+    std::string formatFileSize(uint32_t size);
+    std::string formatCodeLines(uint32_t lines);
+    uint32_t countCodeLines(const std::string& filePath);
+
+    // Function to check if a string starts with another string (case insensitive)
+    bool startsWith(const std::string& mainStr, const std::string& toMatch);
+    bool compareNoCase(const std::string& str1, const std::string& str2);
+
+    bool containsNoCase(const std::string& str1, const std::string& str2);
 }
-
-// add QString to std::formatCodeLines
-
-template <>
-struct std::formatter<QString, char> {
-    // Parsing method
-    constexpr auto parse(std::format_parse_context& ctx) {
-        // Parse the format specifier if any
-        auto it = ctx.begin();
-        auto end = ctx.end();
-
-        if (it != end && *it != '}') {
-            throw std::format_error("Invalid format specifier");
-        }
-        return it;
-    }
-
-    // Formatting method
-    auto format(const QString& qstr, std::format_context& ctx) const {
-        // Convert QString to std::string and format it
-        auto str = qstr.toStdString();
-        return std::format_to(ctx.out(), "{}", str);
-    }
-};

@@ -1,26 +1,45 @@
+#include "pch.h"
 #include "helpers.h"
 
-#include <format>
-#include <string>
+#include <fstream>
+#include <iostream>
 #include <string_view>
+#include <ranges>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
 
-QString Helpers::formatFileSize(qint32 size)
+std::string Helpers::formatFileSize(uint32_t size)
 {
-    const qint64 KB = 1024;
-    const qint64 MB = 1024 * KB;
-    const qint64 GB = 1024 * MB;
-    const qint64 TB = 1024 * GB;
+    const int64_t KB = 1024;
+    const int64_t MB = 1024 * KB;
+    const int64_t GB = 1024 * MB;
+    const int64_t TB = 1024 * GB;
+
+    std::ostringstream oss;
 
     if (size >= TB)
-        return QString::number(size / (double)TB, 'f', 2) + " TB";
+    {
+        oss << std::fixed << std::setprecision(2) << (size / static_cast<double>(TB)) << " TB";
+    }
     else if (size >= GB)
-        return QString::number(size / (double)GB, 'f', 2) + " GB";
+    {
+        oss << std::fixed << std::setprecision(2) << (size / static_cast<double>(GB)) << " GB";
+    }
     else if (size >= MB)
-        return QString::number(size / (double)MB, 'f', 2) + " MB";
+    {
+        oss << std::fixed << std::setprecision(2) << (size / static_cast<double>(MB)) << " MB";
+    }
     else if (size >= KB)
-        return QString::number(size / (double)KB, 'f', 2) + " KB";
+    {
+        oss << std::fixed << std::setprecision(2) << (size / static_cast<double>(KB)) << " KB";
+    }
     else
-        return QString::number(size) + " bytes";
+    {
+        oss << size << " bytes";
+    }
+
+    return oss.str();
 }
 
 struct file_size_facet : public std::numpunct<char> {
@@ -29,36 +48,77 @@ struct file_size_facet : public std::numpunct<char> {
     virtual std::string do_grouping() const { return "\003"; }
 };
 
-QString Helpers::formatCodeLines(qint32 lines)
+std::string Helpers::formatCodeLines(uint32_t lines)
 {
     static std::locale withgroupings(std::locale(), new file_size_facet);
 
-    std::string size_formatted = std::format(withgroupings, "{:L}", lines);
-
-    return QString::fromStdString(size_formatted);
+    return std::format(withgroupings, "{:L}", lines);
 }
 
-uint32_t Helpers::countCodeLines(const QString& filePath)
+uint32_t Helpers::countCodeLines(const std::string& filePath)
 {
-    QFile file(filePath);
-    
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) 
+    std::ifstream file(filePath);
+
+    if (file.is_open())
     {
-        QTextStream in(&file);
         uint32_t lineCount = 0;
-        while (!in.atEnd()) {
-            QString line = in.readLine();
-            if (!line.trimmed().isEmpty()) {
+        std::string line;
+
+        while (std::getline(file, line))
+        {
+            // Trim leading and trailing whitespace
+            line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+            line.erase(std::find_if(line.rbegin(), line.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), line.end());
+
+            if (!line.empty())
+            {
                 ++lineCount;
             }
         }
 
         file.close();
-
         return lineCount;
     }
-    
-    qWarning() << "Cannot open file:" << filePath;
 
-    return -1;
+    std::cerr << "Cannot open file: " << filePath << std::endl;
+    return static_cast<uint32_t>(-1); // or return 0 if you prefer
+}
+
+// Helper function to convert a string to lowercase using C++20 features
+std::string toLowerCase(const std::string& str) {
+    std::string result;
+    std::ranges::transform(str, std::back_inserter(result), [](unsigned char c) {
+        return std::tolower(c);
+        });
+    return result;
+}
+
+bool Helpers::startsWith(const std::string& mainStr, const std::string& toMatch)
+{
+    if (mainStr.size() < toMatch.size())
+        return false;
+
+    // Create views for the beginning of mainStr and the entire toMatch
+    auto mainStrView = mainStr | std::ranges::views::take(toMatch.size());
+    auto toMatchView = toMatch;
+
+    // Use std::ranges::equal with a case-insensitive comparator
+    return std::ranges::equal(mainStrView, toMatchView,
+        [](char a, char b) {
+            return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+        });
+}
+
+bool Helpers::compareNoCase(const std::string& str1, const std::string& str2)
+{
+    return toLowerCase(str1) == toLowerCase(str2);
+}
+
+bool Helpers::containsNoCase(const std::string& str1, const std::string& str2)
+{
+    std::string lowerStr1 = toLowerCase(str1);
+    std::string lowerStr2 = toLowerCase(str2);
+
+    // Check if lowerStr1 contains lowerStr2
+    return lowerStr1.find(lowerStr2) != std::string::npos;
 }
