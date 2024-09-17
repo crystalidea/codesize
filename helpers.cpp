@@ -70,6 +70,9 @@ uint32_t Helpers::countCodeLines(const std::string& filePath)
             line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) { return !std::isspace(ch); }));
             line.erase(std::find_if(line.rbegin(), line.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), line.end());
 
+            if (line == "}" || line == "{") // we're not interested in these lines
+                continue;
+            
             if (!line.empty())
             {
                 ++lineCount;
