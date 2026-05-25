@@ -3,11 +3,15 @@
 #include "user_ignored_files.h"
 #include "helpers.h"
 
+#include <algorithm>
+
 bool CodeType::isMyFile(const fs::path& file) const
 {
     string extension = file.extension().string();
 
-    return std::find(_extensions.begin(), _extensions.end(), extension) != _extensions.end();
+    // Match extensions case-insensitively (e.g. .CPP, .H on Windows)
+    return std::any_of(_extensions.begin(), _extensions.end(),
+        [&extension](const string& ext) { return Helpers::compareNoCase(ext, extension); });
 }
 
 CodeSizeResult CodeType::processDirectory(const string& directoryPath, const UserIgnoredFiles* pUserIgnored, bool verbose) const
@@ -18,46 +22,73 @@ CodeSizeResult CodeType::processDirectory(const string& directoryPath, const Use
 
     if (fs::exists(directoryPath) && fs::is_directory(directoryPath))
     {
-        for (const auto& entry : fs::recursive_directory_iterator(directoryPath))
-        {
-            std::string filename = entry.path().filename().string();
-            std::string fullPath = entry.path().string();
+        std::error_code ec;
+        fs::recursive_directory_iterator iter(
+            directoryPath, fs::directory_options::skip_permission_denied, ec);
 
-            if (fs::is_regular_file(entry.status()))
+        if (ec)
+        {
+            std::cerr << "Cannot read directory: " << directoryPath
+                      << " (" << ec.message() << ")\n";
+            return CodeSizeResult(totalSizeInBytes, nTotalFiles, codeLines);
+        }
+
+        const fs::recursive_directory_iterator end;
+
+        while (iter != end)
+        {
+            const fs::directory_entry& entry = *iter;
+
+            std::error_code fileEc;
+            if (entry.is_regular_file(fileEc) && !fileEc)
             {
-                // we can safely assume the code file size is less than 4GB
-                uint32_t fileSize = static_cast<uint32_t>(fs::file_size(entry.path()));
+                std::string filename = entry.path().filename().string();
+                std::string fullPath = entry.path().string();
 
                 if (isMyFile(entry.path())) // Check if the extension matches any in the filter list
                 {
-                    bool bSkip = false;
+                    // we can safely assume the code file size is less than 4GB
+                    uint32_t fileSize = static_cast<uint32_t>(fs::file_size(entry.path(), fileEc));
 
-                    if (isIgnoredFile(filename))
+                    if (!fileEc)
                     {
-                        if (verbose)
-                            std::cout << "Ignored file: " << fullPath << std::endl;
+                        bool bSkip = false;
 
-                        bSkip = true;
+                        if (isIgnoredFile(filename))
+                        {
+                            if (verbose)
+                                std::cout << "Ignored file: " << fullPath << std::endl;
+
+                            bSkip = true;
+                        }
+                        else if (pUserIgnored->matchesFile(fullPath))
+                        {
+                            if (verbose)
+                                std::cout << "User ignored file: " << fullPath << std::endl;
+
+                            bSkip = true;
+                        }
+
+                        if (!bSkip)
+                        {
+                            if (verbose)
+                                std::cout << "Code file: " << fullPath << std::endl;
+
+                            totalSizeInBytes += fileSize;
+                            codeLines += Helpers::countCodeLines(fullPath);
+
+                            nTotalFiles++;
+                        }
                     }
-                    else if (pUserIgnored->matchesFile(fullPath))
-                    {
-                        if (verbose)
-                            std::cout << "User ignored file: " << fullPath << std::endl;
-
-                        bSkip = true;
-                    }
-
-                    if (bSkip)
-                        continue;
-
-                    if (verbose)
-                        std::cout << "Code file: " << fullPath << std::endl;
-
-                    totalSizeInBytes += fileSize;
-                    codeLines += Helpers::countCodeLines(fullPath);
-
-                    nTotalFiles++;
                 }
+            }
+
+            iter.increment(ec);
+
+            if (ec)
+            {
+                std::cerr << "Stopping directory scan: " << ec.message() << "\n";
+                break;
             }
         }
     }

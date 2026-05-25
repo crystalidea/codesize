@@ -84,7 +84,7 @@ uint32_t Helpers::countCodeLines(const std::string& filePath)
     }
 
     std::cerr << "Cannot open file: " << filePath << std::endl;
-    return static_cast<uint32_t>(-1); // or return 0 if you prefer
+    return 0;
 }
 
 // Helper function to convert a string to lowercase using C++20 features
