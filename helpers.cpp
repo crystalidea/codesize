@@ -63,17 +63,67 @@ uint32_t Helpers::countCodeLines(const std::string& filePath)
     {
         uint32_t lineCount = 0;
         std::string line;
+        bool inBlockComment = false; // carries /* ... */ state across lines
 
         while (std::getline(file, line))
         {
-            // Trim leading and trailing whitespace
-            line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) { return !std::isspace(ch); }));
-            line.erase(std::find_if(line.rbegin(), line.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), line.end());
+            std::string code; // the line with // and /* */ comments stripped out
+            bool inString = false;
+            bool inChar = false;
 
-            if (line == "}" || line == "{") // we're not interested in these lines
+            for (size_t i = 0; i < line.size(); ++i)
+            {
+                char c = line[i];
+                char next = (i + 1 < line.size()) ? line[i + 1] : '\0';
+
+                if (inBlockComment)
+                {
+                    if (c == '*' && next == '/')
+                    {
+                        inBlockComment = false;
+                        ++i; // also consume the '/'
+                    }
+                    continue;
+                }
+
+                if (inString || inChar)
+                {
+                    code += c;
+                    if (c == '\\' && next != '\0') // keep escaped char as-is
+                        code += line[++i];
+                    else if (inString && c == '"')
+                        inString = false;
+                    else if (inChar && c == '\'')
+                        inChar = false;
+                    continue;
+                }
+
+                if (c == '/' && next == '/')
+                    break; // rest of the line is a comment
+
+                if (c == '/' && next == '*')
+                {
+                    inBlockComment = true;
+                    ++i; // also consume the '*'
+                    continue;
+                }
+
+                if (c == '"')
+                    inString = true;
+                else if (c == '\'')
+                    inChar = true;
+
+                code += c;
+            }
+
+            // Trim leading and trailing whitespace
+            code.erase(code.begin(), std::find_if(code.begin(), code.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+            code.erase(std::find_if(code.rbegin(), code.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), code.end());
+
+            if (code == "}" || code == "{") // we're not interested in these lines
                 continue;
-            
-            if (!line.empty())
+
+            if (!code.empty())
             {
                 ++lineCount;
             }
